@@ -49,6 +49,17 @@ widget:
 
 # CompactGenderClassifier: Ultra-Efficient Gender Classifier Trained From Scratch
 
+<div align="center">
+
+[![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model%20Hub-yellow.svg)](https://huggingface.co/SupratimRK/compact-gender-classifier)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-black?logo=github)](https://github.com/SupratimRK/.model.base.gc)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![ONNX Runtime](https://img.shields.io/badge/ONNX-INT8%20Quantized-blue)](https://onnxruntime.ai/)
+
+**[🤗 Hugging Face Model Hub](https://huggingface.co/SupratimRK/compact-gender-classifier)** | **[🐙 GitHub Repository](https://github.com/SupratimRK/.model.base.gc)**
+
+</div>
+
 `CompactGenderClassifier` is a state-of-the-art, ultra-lightweight neural text classifier trained **from scratch** on a curated dataset of **197,165 labeled unique first names** (101,645 Female + 95,520 Male across diverse global and Indian origins).
 
 Unlike generic large language models or pretrained BERT variants, `CompactGenderClassifier` has **zero external pretrained dependencies**, weighs just **~632 KB** (INT8 ONNX), and delivers sub-millisecond CPU inference (**~0.50 ms per query**).
