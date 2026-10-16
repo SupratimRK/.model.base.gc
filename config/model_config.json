@@ -10,6 +10,6 @@
     "0": "MALE",
     "1": "FEMALE"
   },
-  "best_val_accuracy": 0.8581632136163315,
-  "best_val_f1": 0.858183160795212
+  "best_val_accuracy": 0.8574968394437421,
+  "best_val_f1": 0.8575081660492488
 }
