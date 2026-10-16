@@ -1,0 +1,13 @@
+{
+  "name": "compact-gender-classifier",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Ultra-compact sub-millisecond gender neural classifier trained from scratch on first names",
+  "main": "scripts/classifier.mjs",
+  "scripts": {
+    "test": "node scripts/test_benchmark.mjs"
+  },
+  "dependencies": {
+    "onnxruntime-node": "^1.30.0"
+  }
+}
