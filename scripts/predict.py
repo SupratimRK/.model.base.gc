@@ -179,6 +179,7 @@ class GenderClassifier:
 
 def main():
     parser = argparse.ArgumentParser(description="CompactGenderClassifier Prediction Tool")
+    parser.add_argument("names", nargs="*", help="Name string(s) to classify as positional arguments")
     parser.add_argument("--text", nargs="+", help="Name string(s) to classify")
     parser.add_argument("-i", "--interactive", action="store_true", help="Start interactive CLI loop")
     parser.add_argument("--use-pytorch", action="store_true", help="Force using PyTorch model instead of ONNX")
@@ -209,8 +210,9 @@ def main():
                 break
         return
 
-    if args.text:
-        names = args.text
+    input_names = args.names if args.names else args.text
+    if input_names:
+        names = input_names
     else:
         names = [
             "Supratim",

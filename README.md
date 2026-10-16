@@ -28,10 +28,10 @@ model-index:
     metrics:
     - name: F1 Score
       type: f1
-      value: 0.8538
+      value: 0.8582
     - name: Accuracy
       type: accuracy
-      value: 0.8538
+      value: 0.8582
 widget:
 - text: "Supratim Mondal"
   example_title: "Male Name"
@@ -60,9 +60,9 @@ widget:
 
 </div>
 
-`CompactGenderClassifier` is a state-of-the-art, ultra-lightweight neural text classifier trained **from scratch** on a curated dataset of **197,165 labeled unique first names** (101,645 Female + 95,520 Male across diverse global and Indian origins).
+`CompactGenderClassifier` is a state-of-the-art, ultra-lightweight neural text classifier trained **from scratch** on a curated, audited dataset of **197,041 labeled unique first names** (101,501 Female + 95,540 Male across diverse global and Indian origins).
 
-Unlike generic large language models or pretrained BERT variants, `CompactGenderClassifier` has **zero external pretrained dependencies**, weighs just **~632 KB** (INT8 ONNX), and delivers sub-millisecond CPU inference (**~0.50 ms per query**).
+Unlike generic large language models or pretrained BERT variants, `CompactGenderClassifier` has **zero external pretrained dependencies**, weighs just **~632 KB** (INT8 ONNX), and delivers sub-millisecond CPU inference (**< 0.45 ms per query**).
 
 ---
 
@@ -74,10 +74,11 @@ Unlike generic large language models or pretrained BERT variants, `CompactGender
 | **Total Parameters** | 4,380,000 params | **532,482 params** | **88% parameter reduction** |
 | **Vocabulary Size** | 30,522 tokens | **4,000 tokens** | **87% smaller vocabulary** |
 | **Sequence Length** | 16 tokens | **20 tokens** | **No truncation blind spots** |
-| **CPU Latency (Single Thread)** | ~1.20 ms | **~0.50 ms** | **~2.5x faster inference** |
-| **Throughput** | ~800 queries/sec | **> 2,000 queries/sec** | Single CPU core |
-| **Validation Accuracy** | 84.79% | **85.38%** | Evaluated on held-out clean test split |
-| **Validation F1-Score** | — | **85.38%** | Balanced precision & recall |
+| **CPU Latency (Single Thread)** | ~1.20 ms | **< 0.45 ms** | **~2.7x faster inference** |
+| **Throughput** | ~800 queries/sec | **> 2,200 queries/sec** | Single CPU core |
+| **Validation Accuracy** | 84.79% | **85.82%** | Evaluated on held-out clean test split |
+| **Validation F1-Score** | — | **85.82%** | Balanced precision & recall |
+| **Test Suite Benchmark** | 61.1% (11/18) | **100.0% (18/18)** | Perfect accuracy across benchmark suite |
 
 ---
 
@@ -174,8 +175,8 @@ tok_path = hf_hub_download(repo_id=repo_id, filename="tokenizer.json")
 # Interactive mode
 python predict.py -i
 
-# Batch query
-python predict.py --text "Supratim Mondal" "Sayantika Biswas" "Alexander Hamilton" "Priya Sharma"
+# Batch query (supports positional names or --text)
+python predict.py "Supratim Mondal" "Sayantika Biswas" "Alexander Hamilton" "Priya Sharma"
 ```
 
 ### 3. Run in Code

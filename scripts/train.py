@@ -24,7 +24,7 @@ NUM_LAYERS = 2
 NUM_HEADS = 4
 MAX_LENGTH = 20
 BATCH_SIZE = 256
-EPOCHS = 6
+EPOCHS = 8
 LEARNING_RATE = 5e-4
 WEIGHT_DECAY = 0.01
 LABEL_SMOOTHING = 0.05
@@ -180,37 +180,49 @@ def main():
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"--> Model Initialized: {total_params:,} trainable parameters")
 
-    # 6. Loss & Optimization
-    criterion = nn.CrossEntropyLoss(label_smoothing=LABEL_SMOOTHING)
+    # 6. Loss & Optimization (Class-weighted for maximum precision)
+    num_m = raw_train_labels.count(0)
+    num_f = raw_train_labels.count(1)
+    total_samples = num_m + num_f
+    weight_m = total_samples / (2.0 * max(1, num_m))
+    weight_f = total_samples / (2.0 * max(1, num_f))
+    class_weights = torch.tensor([weight_m, weight_f], dtype=torch.float, device=device)
+    print(f"--> Loss Class Weights: MALE={weight_m:.3f}, FEMALE={weight_f:.3f}")
+
+    criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=LABEL_SMOOTHING)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
     total_steps = len(train_loader) * EPOCHS
     warmup_steps = int(total_steps * 0.1)
     scheduler = get_cosine_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
+    scaler = torch.amp.GradScaler("cuda", enabled=(device.type == "cuda"))
 
     best_val_f1 = 0.0
     best_val_acc = 0.0
     best_epoch = -1
 
-    # 7. Training Loop
-    print("\n--> Starting Training Epochs...")
+    # 7. Training Loop (Mixed-Precision GPU accelerated)
+    print(f"\n--> Starting GPU Training ({EPOCHS} epochs, batch_size={BATCH_SIZE}, mixed-precision FP16)...")
     for epoch in range(1, EPOCHS + 1):
         t_epoch_start = time.time()
         model.train()
         total_loss = 0.0
 
         for step, (b_ids, b_mask, b_labels) in enumerate(train_loader):
-            b_ids = b_ids.to(device)
-            b_mask = b_mask.to(device)
-            b_labels = b_labels.to(device)
+            b_ids = b_ids.to(device, non_blocking=True)
+            b_mask = b_mask.to(device, non_blocking=True)
+            b_labels = b_labels.to(device, non_blocking=True)
 
             optimizer.zero_grad()
-            logits = model(b_ids, b_mask)
-            loss = criterion(logits, b_labels)
-            loss.backward()
+            with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=(device.type == "cuda")):
+                logits = model(b_ids, b_mask)
+                loss = criterion(logits, b_labels)
 
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
             nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
             scheduler.step()
 
             total_loss += loss.item()
@@ -225,12 +237,13 @@ def main():
 
         with torch.no_grad():
             for b_ids, b_mask, b_labels in val_loader:
-                b_ids = b_ids.to(device)
-                b_mask = b_mask.to(device)
-                b_labels = b_labels.to(device)
+                b_ids = b_ids.to(device, non_blocking=True)
+                b_mask = b_mask.to(device, non_blocking=True)
+                b_labels = b_labels.to(device, non_blocking=True)
 
-                logits = model(b_ids, b_mask)
-                loss = criterion(logits, b_labels)
+                with torch.amp.autocast(device_type=device.type, dtype=torch.float16, enabled=(device.type == "cuda")):
+                    logits = model(b_ids, b_mask)
+                    loss = criterion(logits, b_labels)
                 val_loss += loss.item()
 
                 preds = torch.argmax(logits, dim=-1)
