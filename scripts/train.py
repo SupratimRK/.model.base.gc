@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import json
-import random
 import torch
 import torch.nn as nn
 from torch.utils.data import TensorDataset, DataLoader
@@ -23,8 +22,8 @@ HIDDEN_DIM = 128
 NUM_LAYERS = 2
 NUM_HEADS = 4
 MAX_LENGTH = 20
-BATCH_SIZE = 256
-EPOCHS = 8
+BATCH_SIZE = 512
+EPOCHS = 6
 LEARNING_RATE = 5e-4
 WEIGHT_DECAY = 0.01
 LABEL_SMOOTHING = 0.05
@@ -52,34 +51,6 @@ else:
 
 GENDER_MAP = {"MALE": 0, "FEMALE": 1}
 
-def augment_first_names(texts, labels, aug_rate=0.25):
-    """
-    Augments first names with casing variations (TitleCase, UPPERCASE, lowercase).
-    Strictly first names only - no surname concatenation.
-    """
-    random.seed(42)
-    aug_texts = []
-    aug_labels = []
-
-    for text, label in zip(texts, labels):
-        t_str = str(text).strip()
-        if not t_str:
-            continue
-        aug_texts.append(t_str)
-        aug_labels.append(label)
-
-        if random.random() < aug_rate:
-            r = random.random()
-            if r < 0.4:
-                aug_texts.append(t_str.lower())
-            elif r < 0.7:
-                aug_texts.append(t_str.upper())
-            else:
-                aug_texts.append(t_str.title())
-            aug_labels.append(label)
-
-    return aug_texts, aug_labels
-
 def pre_tokenize_dataset(tokenizer, texts, max_length=MAX_LENGTH):
     """Pre-tokenize all texts in memory into contiguous int32 tensors."""
     t0 = time.time()
@@ -99,7 +70,7 @@ def pre_tokenize_dataset(tokenizer, texts, max_length=MAX_LENGTH):
 
 def main():
     print("===============================================================")
-    print("Training Dedicated Ultra-Compact Gender Classifier From Scratch")
+    print("Training Dedicated Ultra-Compact Gender Classifier (100% Uncased)")
     print("===============================================================")
     print(f"Vocab Size:    {VOCAB_SIZE}")
     print(f"Embedding Dim: {EMB_DIM} (Factorized -> {HIDDEN_DIM})")
@@ -117,6 +88,7 @@ def main():
 
     tokenizer = PreTrainedTokenizerFast(
         tokenizer_file=tok_json_path,
+        do_lower_case=True,
         pad_token="[PAD]",
         unk_token="[UNK]",
         cls_token="[CLS]",
@@ -136,23 +108,19 @@ def main():
     df_train_gender = df_train[df_train['gender'].isin(['MALE', 'FEMALE'])].copy()
     df_val_gender = df_val[df_val['gender'].isin(['MALE', 'FEMALE'])].copy()
 
-    name_col_train = 'name' if 'name' in df_train_gender.columns else 'text'
-    name_col_val = 'name' if 'name' in df_val_gender.columns else 'text'
+    name_col_train = 'text' if 'text' in df_train_gender.columns else 'name'
+    name_col_val = 'text' if 'text' in df_val_gender.columns else 'name'
 
-    raw_train_texts = df_train_gender[name_col_train].astype(str).tolist()
-    raw_train_labels = [GENDER_MAP[g] for g in df_train_gender['gender'].tolist()]
+    train_texts = df_train_gender[name_col_train].dropna().astype(str).str.lower().str.strip().tolist()
+    train_labels = [GENDER_MAP[g] for g in df_train_gender['gender'].tolist()]
 
-    val_texts = df_val_gender[name_col_val].astype(str).tolist()
+    val_texts = df_val_gender[name_col_val].dropna().astype(str).str.lower().str.strip().tolist()
     val_labels = [GENDER_MAP[g] for g in df_val_gender['gender'].tolist()]
 
-    print(f"--> Base Labeled Train Records: {len(raw_train_texts):,} (Male: {raw_train_labels.count(0):,}, Female: {raw_train_labels.count(1):,})")
-    print(f"--> Base Labeled Val Records:   {len(val_texts):,} (Male: {val_labels.count(0):,}, Female: {val_labels.count(1):,})")
+    print(f"--> Master Labeled Train Records: {len(train_texts):,} (Male: {train_labels.count(0):,}, Female: {train_labels.count(1):,})")
+    print(f"--> Master Labeled Val Records:   {len(val_texts):,} (Male: {val_labels.count(0):,}, Female: {val_labels.count(1):,})")
 
-    # 3. Apply Casing Augmentations
-    train_texts, train_labels = augment_first_names(raw_train_texts, raw_train_labels, aug_rate=0.25)
-    print(f"--> Augmented Train Records:    {len(train_texts):,} samples (first names with casing diversity)")
-
-    # 4. Pre-Tokenize Datasets
+    # 3. Pre-Tokenize Datasets
     train_ids, train_mask = pre_tokenize_dataset(tokenizer, train_texts, MAX_LENGTH)
     val_ids, val_mask = pre_tokenize_dataset(tokenizer, val_texts, MAX_LENGTH)
 
@@ -162,10 +130,10 @@ def main():
     train_dataset = TensorDataset(train_ids, train_mask, train_labels_tensor)
     val_dataset = TensorDataset(val_ids, val_mask, val_labels_tensor)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False, pin_memory=True)
 
-    # 5. Initialize Model
+    # 4. Initialize Model
     model = CompactGenderClassifier(
         vocab_size=VOCAB_SIZE,
         emb_dim=EMB_DIM,
@@ -180,9 +148,9 @@ def main():
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"--> Model Initialized: {total_params:,} trainable parameters")
 
-    # 6. Loss & Optimization (Class-weighted for maximum precision)
-    num_m = raw_train_labels.count(0)
-    num_f = raw_train_labels.count(1)
+    # 5. Loss & Optimization (Class-weighted for maximum precision)
+    num_m = train_labels.count(0)
+    num_f = train_labels.count(1)
     total_samples = num_m + num_f
     weight_m = total_samples / (2.0 * max(1, num_m))
     weight_f = total_samples / (2.0 * max(1, num_f))
@@ -201,14 +169,14 @@ def main():
     best_val_acc = 0.0
     best_epoch = -1
 
-    # 7. Training Loop (Mixed-Precision GPU accelerated)
+    # 6. Training Loop (Mixed-Precision GPU accelerated)
     print(f"\n--> Starting GPU Training ({EPOCHS} epochs, batch_size={BATCH_SIZE}, mixed-precision FP16)...")
     for epoch in range(1, EPOCHS + 1):
         t_epoch_start = time.time()
         model.train()
         total_loss = 0.0
 
-        for step, (b_ids, b_mask, b_labels) in enumerate(train_loader):
+        for b_ids, b_mask, b_labels in train_loader:
             b_ids = b_ids.to(device, non_blocking=True)
             b_mask = b_mask.to(device, non_blocking=True)
             b_labels = b_labels.to(device, non_blocking=True)
@@ -275,7 +243,7 @@ def main():
     print(f"Training Complete! Best Epoch: {best_epoch} | Acc: {best_val_acc*100:.2f}% | F1: {best_val_f1*100:.2f}%")
     print("===============================================================")
 
-    # 8. Update Model Config
+    # 7. Update Model Config
     config_path = os.path.join(CONFIG_DIR, "model_config.json")
     model_config = {
         "model_type": "CompactGenderClassifier",
@@ -285,6 +253,7 @@ def main():
         "num_layers": NUM_LAYERS,
         "num_heads": NUM_HEADS,
         "max_length": MAX_LENGTH,
+        "lowercase": True,
         "labels": {
             "0": "MALE",
             "1": "FEMALE"

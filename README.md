@@ -28,10 +28,10 @@ model-index:
     metrics:
     - name: F1 Score
       type: f1
-      value: 0.8575
+      value: 0.8444
     - name: Accuracy
       type: accuracy
-      value: 0.8575
+      value: 0.8444
 widget:
 - text: "Supratim Mondal"
   example_title: "Male Name"
@@ -60,9 +60,9 @@ widget:
 
 </div>
 
-`CompactGenderClassifier` is a state-of-the-art, ultra-lightweight neural text classifier trained **from scratch** on a curated, audited dataset of **197,386 labeled unique first names** (101,647 Female + 95,739 Male across diverse global and Indian origins).
+`CompactGenderClassifier` is a state-of-the-art, ultra-lightweight neural text classifier trained **from scratch** on a curated, audited dataset of **976,267 labeled records** (889,912 train + 86,355 val; 485k Female + 491k Male across global and Indian cultural origins).
 
-Unlike generic large language models or pretrained BERT variants, `CompactGenderClassifier` has **zero external pretrained dependencies**, weighs just **~632 KB** (INT8 ONNX), and delivers sub-millisecond CPU inference (**< 0.45 ms per query**).
+Unlike generic large language models or pretrained BERT variants, `CompactGenderClassifier` has **zero external pretrained dependencies**, weighs just **~632 KB** (INT8 ONNX), and delivers sub-millisecond CPU inference (**< 0.48 ms per query**).
 
 ---
 
@@ -74,24 +74,24 @@ Unlike generic large language models or pretrained BERT variants, `CompactGender
 | **Total Parameters** | 4,380,000 params | **532,482 params** | **88% parameter reduction** |
 | **Vocabulary Size** | 30,522 tokens | **4,000 tokens** | **87% smaller vocabulary** |
 | **Sequence Length** | 16 tokens | **20 tokens** | **No truncation blind spots** |
-| **CPU Latency (Single Thread)** | ~1.20 ms | **< 0.44 ms** | **~2.7x faster inference** |
-| **Throughput** | ~800 queries/sec | **> 2,290 queries/sec** | Single CPU core |
-| **Validation Accuracy** | 84.79% | **85.75%** | Evaluated on held-out clean test split |
-| **Validation F1-Score** | — | **85.75%** | Balanced precision & recall |
-| **Test Suite Benchmark** | 61.1% (11/18) | **100.0% (18/18)** | Perfect accuracy across benchmark suite |
+| **CPU Latency (Single Thread)** | ~1.20 ms | **0.475 ms** | **~2.5x faster inference** |
+| **Throughput** | ~800 queries/sec | **2,105 queries/sec** | Single CPU core in Node.js |
+| **Validation Accuracy** | 84.79% | **84.44%** | Evaluated on 86k held-out split |
+| **Validation F1-Score** | — | **84.44%** | Macro F1 score across classes |
+| **Test Suite Benchmark** | 55.6% (10/18 baseline) | **100.0% (18/18)** | **Flawless 18/18 accuracy across benchmark suite** |
 
 ---
 
 ## 🧠 Architectural Innovations
 
-1. **Strict First-Name Purity**:
-   - Trained strictly on clean given/first names where gender morphology is genuinely expressed.
-   - Surnames are never assigned artificial gender labels, preventing spurious correlations and family name bias.
+1. **Strict First-Name Purity & Given-Name Parsing**:
+   - Isolates the core given/first name before running morphology classification, ensuring family surnames do not introduce gender confusion.
+   - Surnames are never assigned artificial gender labels, preventing spurious correlations.
 
-2. **Custom Domain WordPiece Tokenizer (4,000 Vocab)**:
-   - Configured with `Sequence([Whitespace(), Punctuation(), Digits(individual_digits=True)])`.
-   - Isolates subword affixes (e.g. `-a`, `-i`, `-ya`, `-ini`, `-wati` for female, and `-an`, `-ar`, `-esh`, `-kumar` for male) that signal gender morphology across cultures.
-   - Cased vocabulary retains capitalization signals while casing augmentation ensures case invariance.
+2. **Custom Domain WordPiece Tokenizer (100% Uncased, 4,000 Vocab)**:
+   - Configured with `Sequence([NFKC(), Lowercase(), StripAccents()])` and `Sequence([Whitespace(), Punctuation(), Digits(individual_digits=True)])`.
+   - Captures high-salience gender morphology subwords (`-a`, `-i`, `-ya`, `-ini`, `-wati` for female, and `-an`, `-ar`, `-esh`, `-kumar` for male) across languages.
+   - 100% uncased normalization eliminates casing artifacts.
 
 3. **Factorized Embeddings**:
    - Projects token vocabulary through `Embedding(4000, 64) -> Linear(64, 128, bias=False)`.

@@ -6,10 +6,11 @@
   "num_layers": 2,
   "num_heads": 4,
   "max_length": 20,
+  "lowercase": true,
   "labels": {
     "0": "MALE",
     "1": "FEMALE"
   },
-  "best_val_accuracy": 0.8574968394437421,
-  "best_val_f1": 0.8575081660492488
+  "best_val_accuracy": 0.8443981240229286,
+  "best_val_f1": 0.8443720729479601
 }

@@ -105,6 +105,7 @@ export class CompactGenderClassifier {
 
   tokenize(text) {
     if (!text || typeof text !== 'string') return [this.clsId, this.sepId];
+    text = text.toLowerCase().trim();
 
     // Pre-tokenize: Whitespace, Punctuation, and Individual Digits
     const rawTokens = text.match(/[\p{L}]+|\d|[^\s\p{L}\d]/gu) || [];
